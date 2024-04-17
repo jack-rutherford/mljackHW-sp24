@@ -91,43 +91,87 @@ open jackAS;
   
      (* codegen takes an AST node, the output file, a list of bindings, and the class name *)
      fun codegen(class'(id,classVars,subroutines),outFile,bindings,className) =
-	 (TextIO.output(TextIO.stdOut, "Attempt to compile class named "^id^"\n");
-	  let val bindingsNew = createClassBindings(classVars)
-	  in
-	      codegenlist(subroutines,outFile,bindingsNew@bindings,id)
-	  end)
+      (
+        TextIO.output(TextIO.stdOut, "Attempt to compile class named "^id^"\n");
+        let val bindingsNew = createClassBindings(classVars)
+        in
+          codegenlist(subroutines,outFile,bindingsNew@bindings,id)
+        end
+      )
 
-       | codegen(constructor'(typ,id,params,(vardecs,statements)),outFile,bindings,className) =
-	 TextIO.output(TextIO.stdOut, "Attempt to compile constructor named "^id^"\n")
+    | codegen(constructor'(typ,id,params,(vardecs,statements)),outFile,bindings,className) =
+	      TextIO.output(TextIO.stdOut, "Attempt to compile constructor named "^id^"\n")
 
-       | codegen(function'(typ,id,params,(vardecs,statements)),outFile,bindings,className) =
-	 (TextIO.output(TextIO.stdOut, "Attempt to compile function named "^id^"\n");
-	  TextIO.output(outFile,"function "^className^"."^id^" "^Int.toString(length vardecs)^"\n");
-	  codegenlist(statements,outFile,bindings,className))
+    | codegen(function'(typ,id,params,(vardecs,statements)),outFile,bindings,className) =
+	    (
+        TextIO.output(TextIO.stdOut, "Attempt to compile function named "^id^"\n");
+        TextIO.output(outFile,"function "^className^"."^id^" "^Int.toString(length vardecs)^"\n");
+        codegenlist(statements,outFile,bindings,className)
+      )
 
-       | codegen(method'(typ,id,params,(vardecs,statements)),outFile,bindings,className) =
-	 TextIO.output(TextIO.stdOut, "Attempt to compile method named "^id^"\n")
+    | codegen(method'(typ,id,params,(vardecs,statements)),outFile,bindings,className) =
+	      TextIO.output(TextIO.stdOut, "Attempt to compile method named "^id^"\n")
 	 
-	 | codegen(do'(call),outFile,bindings,className) =
-	 (TextIO.output(TextIO.stdOut, "Attempt to call a subroutine with a do statement\n");
-	 codegen(call,outFile,bindings,className))
+	  | codegen(do'(call),outFile,bindings,className) =
+      (
+        TextIO.output(TextIO.stdOut, "Attempt to call a subroutine with a do statement\n");
+        codegen(call,outFile,bindings,className);
+        TextIO.output(outFile, "pop temp 0\n")
+      )
 	 
-	 | codegen(subcallq'(id1,id2,exprlist),outFile,bindings,className) =
-	 (TextIO.output(TextIO.stdOut, "Attempt to call "^id1^"."^id2^"\n");
-		codegenlist(exprlist,outFile,bindings,className))
+	  | codegen(subcallq'(id1,id2,exprlist),outFile,bindings,className) =
+      (
+        TextIO.output(TextIO.stdOut, "Attempt to call "^id1^"."^id2^"\n");
+        codegenlist(exprlist,outFile,bindings,className);
+        TextIO.output(outFile, "call "^id1^"."^id2^" "^(Int.toString(length exprlist))^"\n")
+      )
 	 
-	 | codegen(returnvoid',outFile,bindings,className) =
-	 (TextIO.output(TextIO.stdOut, "Attempt returnvoid statement\n");
-		TextIO.output(outFile, "push constant 0\nreturn\n"))
+	  | codegen(returnvoid',outFile,bindings,className) =
+      (
+        TextIO.output(TextIO.stdOut, "Attempt returnvoid statement\n");
+        TextIO.output(outFile, "push constant 0\nreturn\n")
+      )
 
-       | codegen(_,outFile,bindings,className) =
-         (TextIO.output(TextIO.stdOut, "Attempt to compile expression not currently supported!\n");
-          raise Unimplemented) 
+    | codegen(add'(e1,e2),outFile,bindings,className) =
+	    (TextIO.output(TextIO.stdOut, "Attempt to compile addition\n");
+        codegen(e1,outFile,bindings,className);
+        codegen(e2,outFile,bindings,className);
+        TextIO.output(outFile, "add\n")
+      )
 
-     and codegenlist([],outFile,bindings,className) = ()
-       | codegenlist(h::t,outFile,bindings,className) =
-	 (codegen(h,outFile,bindings,className);
-	  codegenlist(t,outFile,bindings,className))
+    | codegen(sub'(e1,e2),outFile,bindings,className) =
+      (TextIO.output(TextIO.stdOut, "Attempt to compile subtraction\n");
+        codegen(e1,outFile,bindings,className);
+        codegen(e2,outFile,bindings,className);
+        TextIO.output(outFile, "sub\n")
+      )
+
+    | codegen(prod'(e1,e2),outFile,bindings,className) =
+      (TextIO.output(TextIO.stdOut, "Attempt to compile multiplication\n");
+        codegen(e1,outFile,bindings,className);
+        codegen(e2,outFile,bindings,className);
+        TextIO.output(outFile, "call Math.multiply 2\n")
+      )
+
+    | codegen(div'(e1,e2),outFile,bindings,className) =
+      (TextIO.output(TextIO.stdOut, "Attempt to compile division\n");
+        codegen(e1,outFile,bindings,className);
+        codegen(e2,outFile,bindings,className);
+        TextIO.output(outFile, "call Math.divide 2\n")
+      )
+
+    | codegen(integer'(i),outFile,bindings,className) =
+      (TextIO.output(TextIO.stdOut, "Attempt to compile integer\n");
+       TextIO.output(outFile, "push constant "^Int.toString(i)^"\n"))
+
+    | codegen(_,outFile,bindings,className) =
+      (TextIO.output(TextIO.stdOut, "Attempt to compile expression not currently supported!\n");
+       raise Unimplemented) 
+
+    and codegenlist([],outFile,bindings,className) = ()
+    | codegenlist(h::t,outFile,bindings,className) =
+      (codegen(h,outFile,bindings,className);
+      codegenlist(t,outFile,bindings,className))
 
      fun compile filename  = 
          let val (ast, _) = jackparse filename

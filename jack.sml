@@ -102,18 +102,18 @@ open jackAS;
       )
 
     | codegen(constructor'(typ,id,params,(vardecs,statements)),outFile,bindings,className) =
-	      (
-          TextIO.output(TextIO.stdOut, "Attempt to compile constructor named "^id^"\n");
-          let val numFields = numBindings("field", bindings)
-              val paramBindings = createParamBindings(params, 0)
-          in
-            (* TextIO.output(TextIO.stdOut, "Statements: "^statements^"\n"); *)
-            TextIO.output(outFile,"function "^className^"."^id^" "^Int.toString(length vardecs)^"\n");
-            TextIO.output(outFile,"push constant "^(Int.toString(length paramBindings))^"\n");
-            TextIO.output(outFile,"call Memory.alloc 1\n");
-            TextIO.output(outFile,"pop pointer 0\n")
-          end
-        )
+      (
+        TextIO.output(TextIO.stdOut, "Attempt to compile constructor named "^id^"\n");
+        let val numFields = numBindings("field", bindings)
+            val paramBindings = createParamBindings(params, 0)
+            val localBindings = createLocalBindings(vardecs)
+        in
+          TextIO.output(outFile,"function "^className^"."^id^" "^Int.toString(length vardecs)^"\n");
+          TextIO.output(outFile,"push constant "^(Int.toString(length paramBindings))^"\n");
+          TextIO.output(outFile,"call Memory.alloc 1\n");
+          TextIO.output(outFile,"pop pointer 0\n")
+        end
+      )
 
     | codegen(function'(typ,id,params,(vardecs,statements)),outFile,bindings,className) =
 	    (
@@ -131,9 +131,19 @@ open jackAS;
             TextIO.output(outFile,"function "^className^"."^id^" "^Int.toString(length vardecs)^"\n");
             TextIO.output(outFile,"push argument 0\npop pointer 0\n");
             codegenlist(statements,outFile,bindingsNew,className);
-            TextIO.output(outFile, "push constant 0\nreturn\n")
+            (* TextIO.output(outFile, "push constant 0\nreturn\n") *)
           end
         )
+
+    | codegen(letval'(id,e),outFile,bindings,className) =
+      (
+        TextIO.output(TextIO.stdOut, "Attempt to compile letval\n");
+        codegen(e,outFile,bindings,className);
+        let val (typ,segment,offset) = boundTo(id,bindings)
+        in
+          TextIO.output(outFile, "pop "^segment^" "^Int.toString(offset)^"\n")
+        end
+      )
 	 
 	  | codegen(do'(call),outFile,bindings,className) =
       (

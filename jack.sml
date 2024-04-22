@@ -93,24 +93,47 @@ open jackAS;
      fun codegen(class'(id,classVars,subroutines),outFile,bindings,className) =
       (
         TextIO.output(TextIO.stdOut, "Attempt to compile class named "^id^"\n");
+        (* TextIO.output(TextIO.stdOut, "Class variables: "^Int.toString(length classVars)^"\n");
+        TextIO.output(TextIO.stdOut, "Subroutines: "^Int.toString(length subroutines)^"\n"); *)
         let val bindingsNew = createClassBindings(classVars)
         in
-          codegenlist(subroutines,outFile,bindingsNew@bindings,id)
+          codegenlist(subroutines,outFile,(bindingsNew@bindings),id)
         end
       )
 
     | codegen(constructor'(typ,id,params,(vardecs,statements)),outFile,bindings,className) =
-	      TextIO.output(TextIO.stdOut, "Attempt to compile constructor named "^id^"\n")
+	      (
+          TextIO.output(TextIO.stdOut, "Attempt to compile constructor named "^id^"\n");
+          let val numFields = numBindings("field", bindings)
+              val paramBindings = createParamBindings(params, 0)
+          in
+            (* TextIO.output(TextIO.stdOut, "Statements: "^statements^"\n"); *)
+            TextIO.output(outFile,"function "^className^"."^id^" "^Int.toString(length vardecs)^"\n");
+            TextIO.output(outFile,"push constant "^(Int.toString(length paramBindings))^"\n");
+            TextIO.output(outFile,"call Memory.alloc 1\n");
+            TextIO.output(outFile,"pop pointer 0\n")
+          end
+        )
 
     | codegen(function'(typ,id,params,(vardecs,statements)),outFile,bindings,className) =
 	    (
         TextIO.output(TextIO.stdOut, "Attempt to compile function named "^id^"\n");
         TextIO.output(outFile,"function "^className^"."^id^" "^Int.toString(length vardecs)^"\n");
-        codegenlist(statements,outFile,bindings,className)
+        codegenlist(statements,outFile,bindings,className);
+        TextIO.output(outFile, "push constant " ^ (Int.toString(length params)) ^"\nreturn\n")
       )
 
     | codegen(method'(typ,id,params,(vardecs,statements)),outFile,bindings,className) =
-	      TextIO.output(TextIO.stdOut, "Attempt to compile method named "^id^"\n")
+        (
+          TextIO.output(TextIO.stdOut, "Attempt to compile method named "^id^"\n");
+          let val bindingsNew = createParamBindings(params, 0)@createLocalBindings(vardecs)@bindings
+          in
+            TextIO.output(outFile,"function "^className^"."^id^" "^Int.toString(length vardecs)^"\n");
+            TextIO.output(outFile,"push argument 0\npop pointer 0\n");
+            codegenlist(statements,outFile,bindingsNew,className);
+            TextIO.output(outFile, "push constant 0\nreturn\n")
+          end
+        )
 	 
 	  | codegen(do'(call),outFile,bindings,className) =
       (

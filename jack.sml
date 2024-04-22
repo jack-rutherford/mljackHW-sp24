@@ -183,9 +183,56 @@ open jackAS;
         TextIO.output(outFile, "call Math.divide 2\n")
       )
 
+    | codegen(and'(e1,e2),outFile,bindings,className) =
+      (TextIO.output(TextIO.stdOut, "Attempt to compile and\n");
+        codegen(e1,outFile,bindings,className);
+        codegen(e2,outFile,bindings,className);
+        TextIO.output(outFile, "and\n")
+      )
+
+    | codegen(or'(e1,e2),outFile,bindings,className) =
+      (TextIO.output(TextIO.stdOut, "Attempt to compile or\n");
+        codegen(e1,outFile,bindings,className);
+        codegen(e2,outFile,bindings,className);
+        TextIO.output(outFile, "or\n")
+      )
+
+    | codegen(lt'(e1,e2),outFile,bindings,className) =
+      (TextIO.output(TextIO.stdOut, "Attempt to compile less than\n");
+        codegen(e1,outFile,bindings,className);
+        codegen(e2,outFile,bindings,className);
+        TextIO.output(outFile, "lt\n")
+      )
+
+    | codegen(gt'(e1,e2),outFile,bindings,className) =
+      (TextIO.output(TextIO.stdOut, "Attempt to compile greater than\n");
+        codegen(e1,outFile,bindings,className);
+        codegen(e2,outFile,bindings,className);
+        TextIO.output(outFile, "gt\n")
+      )
+
+    | codegen(equal'(e1,e2),outFile,bindings,className) =
+      (TextIO.output(TextIO.stdOut, "Attempt to compile equal\n");
+        codegen(e1,outFile,bindings,className);
+        codegen(e2,outFile,bindings,className);
+        TextIO.output(outFile, "eq\n")
+      )
+
     | codegen(integer'(i),outFile,bindings,className) =
       (TextIO.output(TextIO.stdOut, "Attempt to compile integer\n");
        TextIO.output(outFile, "push constant "^Int.toString(i)^"\n"))
+
+    (* | codegen(string'(s),outFile,bindings,className) =
+      (
+        TextIO.output(TextIO.stdOut, "Attempt to compile string\n");
+        TextIO.output(outFile, "push constant "^Int.toString(length s)^"\n");
+        TextIO.output(outFile, "call String.new 1\n");
+        TextIO.output(outFile, "pop temp 0\n");
+        TextIO.output(outFile, "push temp 0\n");
+        TextIO.output(outFile, "push constant 0\n");
+        TextIO.output(outFile, "push constant "^(Int.toString(length s))^"\n");
+        TextIO.output(outFile, "call String.appendChar 4\n")
+      ) *)
 
     | codegen(_,outFile,bindings,className) =
       (TextIO.output(TextIO.stdOut, "Attempt to compile expression not currently supported!\n");

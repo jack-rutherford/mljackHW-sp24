@@ -93,8 +93,6 @@ open jackAS;
      fun codegen(class'(id,classVars,subroutines),outFile,bindings,className) =
       (
         TextIO.output(TextIO.stdOut, "Attempt to compile class named "^id^"\n");
-        (* TextIO.output(TextIO.stdOut, "Class variables: "^Int.toString(length classVars)^"\n");
-        TextIO.output(TextIO.stdOut, "Subroutines: "^Int.toString(length subroutines)^"\n"); *)
         let val bindingsNew = createClassBindings(classVars)
         in
           codegenlist(subroutines,outFile,(bindingsNew@bindings),id)
@@ -104,14 +102,14 @@ open jackAS;
     | codegen(constructor'(typ,id,params,(vardecs,statements)),outFile,bindings,className) =
       (
         TextIO.output(TextIO.stdOut, "Attempt to compile constructor named "^id^"\n");
-        let val numFields = numBindings("field", bindings)
-            val paramBindings = createParamBindings(params, 0)
+        let val paramBindings = createParamBindings(params, 0)
             val localBindings = createLocalBindings(vardecs)
         in
           TextIO.output(outFile,"function "^className^"."^id^" "^Int.toString(length vardecs)^"\n");
           TextIO.output(outFile,"push constant "^(Int.toString(length paramBindings))^"\n");
           TextIO.output(outFile,"call Memory.alloc 1\n");
-          TextIO.output(outFile,"pop pointer 0\n")
+          TextIO.output(outFile,"pop pointer 0\n");
+          codegenlist(statements,outFile,(paramBindings@localBindings@bindings),className)
         end
       )
 
@@ -130,20 +128,53 @@ open jackAS;
           in
             TextIO.output(outFile,"function "^className^"."^id^" "^Int.toString(length vardecs)^"\n");
             TextIO.output(outFile,"push argument 0\npop pointer 0\n");
-            codegenlist(statements,outFile,bindingsNew,className);
-            (* TextIO.output(outFile, "push constant 0\nreturn\n") *)
+            codegenlist(statements,outFile,bindingsNew,className)
           end
         )
 
     | codegen(letval'(id,e),outFile,bindings,className) =
       (
         TextIO.output(TextIO.stdOut, "Attempt to compile letval\n");
-        codegen(e,outFile,bindings,className);
         let val (typ,segment,offset) = boundTo(id,bindings)
         in
+          codegen(e,outFile,bindings,className);
           TextIO.output(outFile, "pop "^segment^" "^Int.toString(offset)^"\n")
         end
       )
+
+    | codegen(if'(e,stmt),outFile,bindings,className) =
+        (
+          TextIO.output(TextIO.stdOut, "Attempt to compile if statement\n");
+          let val l1 = nextLabel()
+              val l2 = nextLabel()
+          in
+            codegen(e,outFile,bindings,className);
+            TextIO.output(outFile, "if-goto "^l1^"\n");
+            TextIO.output(outFile, "goto "^l2^"\n");
+            TextIO.output(outFile, "label "^l1^"\n");
+            List.app (fn s => codegen(s,outFile,bindings,className)) stmt;
+            TextIO.output(outFile, "label "^l2^"\n")
+          end
+        )
+
+    | codegen(ifelse'(e,stmt1,stmt2),outFile,bindings,className) =
+        (
+          TextIO.output(TextIO.stdOut, "Attempt to compile if-else statement\n");
+          let val l1 = nextLabel()
+              val l2 = nextLabel()
+          in
+            codegen(e,outFile,bindings,className);
+            TextIO.output(outFile, "not\n");
+            TextIO.output(outFile, "if-goto "^l1^"\n");
+            List.app (fn s => codegen(s,outFile,bindings,className)) stmt1;
+            TextIO.output(outFile, "goto "^l2^"\n");
+            TextIO.output(outFile, "label "^l1^"\n");
+            List.app (fn s => codegen(s,outFile,bindings,className)) stmt2;
+            TextIO.output(outFile, "label "^l2^"\n")
+          end
+        )
+
+    
 	 
 	  | codegen(do'(call),outFile,bindings,className) =
       (
@@ -158,11 +189,41 @@ open jackAS;
         codegenlist(exprlist,outFile,bindings,className);
         TextIO.output(outFile, "call "^id1^"."^id2^" "^(Int.toString(length exprlist))^"\n")
       )
+
+    | codegen(subcall'(id,exprlist),outFile,bindings,className) =
+      (
+        TextIO.output(TextIO.stdOut, "Attempt to call "^id^"\n");
+        TextIO.output(outFile, "push pointer 0\n");
+        codegenlist(exprlist,outFile,bindings,className);
+        TextIO.output(outFile, "call "^className^"."^id^" "^(Int.toString((length exprlist)+1))^"\n")
+      )
 	 
 	  | codegen(returnvoid',outFile,bindings,className) =
       (
         TextIO.output(TextIO.stdOut, "Attempt returnvoid statement\n");
         TextIO.output(outFile, "push constant 0\nreturn\n")
+      )
+
+    | codegen(return'(e),outFile,bindings,className) =
+      (
+        TextIO.output(TextIO.stdOut, "Attempt return statement\n");
+        codegen(e,outFile,bindings,className);
+        TextIO.output(outFile, "return\n")
+      )
+
+    | codegen(this',outFile,bindings,className) =
+      (
+        TextIO.output(TextIO.stdOut, "Attempt to compile this\n");
+        TextIO.output(outFile, "push pointer 0\n")
+      )
+
+    | codegen(id'(id),outFile,bindings,className) =
+      (
+        TextIO.output(TextIO.stdOut, "Attempt to compile identifier\n");
+        let val (typ,segment,offset) = boundTo(id,bindings)
+        in
+          TextIO.output(outFile, "push "^segment^" "^Int.toString(offset)^"\n")
+        end
       )
 
     | codegen(add'(e1,e2),outFile,bindings,className) =
@@ -219,6 +280,22 @@ open jackAS;
         codegen(e1,outFile,bindings,className);
         codegen(e2,outFile,bindings,className);
         TextIO.output(outFile, "gt\n")
+      )
+
+    | codegen(negate'(e),outFile,bindings,className) =
+      (TextIO.output(TextIO.stdOut, "Attempt to compile negate\n");
+        codegen(e,outFile,bindings,className);
+        TextIO.output(outFile, "neg\n")
+      )
+
+    | codegen(true',outFile,bindings,className) =
+      (TextIO.output(TextIO.stdOut, "Attempt to compile true\n");
+       TextIO.output(outFile, "push constant 0\nnot\n")
+      )
+
+    | codegen(false',outFile,bindings,className) =
+      (TextIO.output(TextIO.stdOut, "Attempt to compile false\n");
+       TextIO.output(outFile, "push constant 0\n")
       )
 
     | codegen(equal'(e1,e2),outFile,bindings,className) =

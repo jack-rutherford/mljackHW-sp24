@@ -50,6 +50,11 @@ open jackAS;
           raise unboundId)
        | boundTo(name,(n,typ,segment,offset)::t) = if name=n then (typ,segment,offset) else boundTo(name,t);
 
+    
+     fun checkBoundTo(name:string,[]) = 
+         (false)
+       | checkBoundTo(name,(n,typ,segment,offset)::t) = if name=n then true else checkBoundTo(name,t);
+
      (* create a list of bindings from a list of names in a particular segment *)
 	 fun createBindings([],typ,segment,offset) = []
 	   | createBindings(name::names,typ,segment,offset) = (TextIO.output(TextIO.stdOut,"generating binding for "^name^":"^typ^":"^segment^":"^Int.toString(offset)^"\n");
@@ -104,9 +109,10 @@ open jackAS;
         TextIO.output(TextIO.stdOut, "Attempt to compile constructor named "^id^"\n");
         let val paramBindings = createParamBindings(params, 0)
             val localBindings = createLocalBindings(vardecs)
+            val bindingsNew = paramBindings@localBindings@bindings
         in
           TextIO.output(outFile,"function "^className^"."^id^" "^Int.toString(length vardecs)^"\n");
-          TextIO.output(outFile,"push constant "^(Int.toString(length paramBindings))^"\n");
+          TextIO.output(outFile,"push constant "^(Int.toString(length bindingsNew))^"\n");
           TextIO.output(outFile,"call Memory.alloc 1\n");
           TextIO.output(outFile,"pop pointer 0\n");
           codegenlist(statements,outFile,(paramBindings@localBindings@bindings),className)
@@ -142,6 +148,19 @@ open jackAS;
         end
       )
 
+    | codegen(letarray'(id,e1,e2),outFile,bindings,className) =
+      (
+        TextIO.output(TextIO.stdOut, "Attempt to compile letarray\n");
+        let val (typ,segment,offset) = boundTo(id,bindings)
+        in
+          codegen(e1,outFile,bindings,className);
+          TextIO.output(outFile, "push "^segment^" "^Int.toString(offset)^"\n");
+          TextIO.output(outFile, "add\n");
+          codegen(e2,outFile,bindings,className);
+          TextIO.output(outFile, "pop temp 0\npop pointer 1\npush temp 0\npop that 0\n")
+        end
+      )
+
     | codegen(if'(e,stmt),outFile,bindings,className) =
         (
           TextIO.output(TextIO.stdOut, "Attempt to compile if statement\n");
@@ -174,7 +193,21 @@ open jackAS;
           end
         )
 
-    
+    | codegen(while'(e,stmt),outFile,bindings,className) =
+        (
+          TextIO.output(TextIO.stdOut, "Attempt to compile while statement\n");
+          let val l1 = nextLabel()
+              val l2 = nextLabel()
+          in
+            TextIO.output(outFile, "label "^l1^"\n");
+            codegen(e,outFile,bindings,className);
+            TextIO.output(outFile, "not\n");
+            TextIO.output(outFile, "if-goto "^l2^"\n");
+            List.app (fn s => codegen(s,outFile,bindings,className)) stmt;
+            TextIO.output(outFile, "goto "^l1^"\n");
+            TextIO.output(outFile, "label "^l2^"\n")
+          end
+        )
 	 
 	  | codegen(do'(call),outFile,bindings,className) =
       (
@@ -185,9 +218,25 @@ open jackAS;
 	 
 	  | codegen(subcallq'(id1,id2,exprlist),outFile,bindings,className) =
       (
-        TextIO.output(TextIO.stdOut, "Attempt to call "^id1^"."^id2^"\n");
-        codegenlist(exprlist,outFile,bindings,className);
-        TextIO.output(outFile, "call "^id1^"."^id2^" "^(Int.toString(length exprlist))^"\n")
+        let val boo = checkBoundTo(id1,bindings)
+        in
+          if boo then
+          (
+            let val (typ,segment,offset) = boundTo(id1,bindings)
+            in
+              TextIO.output(outFile, "push "^segment^" "^Int.toString(offset)^"\n");
+              TextIO.output(TextIO.stdOut, "Attempt to call "^typ^"."^id2^"\n");
+              codegenlist(exprlist,outFile,bindings,className);
+              TextIO.output(outFile, "call "^typ^"."^id2^" "^(Int.toString((length exprlist)+1))^"\n")
+            end
+          )
+          else
+          (
+            TextIO.output(TextIO.stdOut, "Attempt to call "^id1^"."^id2^"\n");
+            codegenlist(exprlist,outFile,bindings,className);
+            TextIO.output(outFile, "call "^id1^"."^id2^" "^(Int.toString(length exprlist))^"\n")
+          )
+        end
       )
 
     | codegen(subcall'(id,exprlist),outFile,bindings,className) =
@@ -288,6 +337,12 @@ open jackAS;
         TextIO.output(outFile, "neg\n")
       )
 
+    | codegen(not'(e),outFile,bindings,className) =
+      (TextIO.output(TextIO.stdOut, "Attempt to compile not\n");
+        codegen(e,outFile,bindings,className);
+        TextIO.output(outFile, "not\n")
+      )
+
     | codegen(true',outFile,bindings,className) =
       (TextIO.output(TextIO.stdOut, "Attempt to compile true\n");
        TextIO.output(outFile, "push constant 0\nnot\n")
@@ -303,6 +358,12 @@ open jackAS;
         codegen(e1,outFile,bindings,className);
         codegen(e2,outFile,bindings,className);
         TextIO.output(outFile, "eq\n")
+      )
+
+    | codegen(null',outFile,bindings,className) =
+      (
+        TextIO.output(TextIO.stdOut, "Attempt to compile null\n");
+        TextIO.output(outFile, "push constant 0\n")
       )
 
     | codegen(integer'(i),outFile,bindings,className) =

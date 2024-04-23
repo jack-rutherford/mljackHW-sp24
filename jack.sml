@@ -122,9 +122,13 @@ open jackAS;
     | codegen(function'(typ,id,params,(vardecs,statements)),outFile,bindings,className) =
 	    (
         TextIO.output(TextIO.stdOut, "Attempt to compile function named "^id^"\n");
-        TextIO.output(outFile,"function "^className^"."^id^" "^Int.toString(length vardecs)^"\n");
-        codegenlist(statements,outFile,bindings,className);
-        TextIO.output(outFile, "push constant " ^ (Int.toString(length params)) ^"\nreturn\n")
+        let val paramBindings = createParamBindings(params, 0)
+            val localBindings = createLocalBindings(vardecs)
+            val bindingsNew = paramBindings@localBindings@bindings
+        in
+          TextIO.output(outFile,"function "^className^"."^id^" "^Int.toString(length vardecs)^"\n");
+          codegenlist(statements,outFile,(paramBindings@localBindings@bindings),className)
+        end
       )
 
     | codegen(method'(typ,id,params,(vardecs,statements)),outFile,bindings,className) =

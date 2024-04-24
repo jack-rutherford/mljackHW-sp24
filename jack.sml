@@ -130,7 +130,7 @@ open jackAS;
             val localBindings = createLocalBindings(vardecs)
             val bindingsNew = paramBindings@localBindings@bindings
         in
-          TextIO.output(outFile,"function "^className^"."^id^" "^Int.toString(length vardecs)^"\n");
+          TextIO.output(outFile,"function "^className^"."^id^" "^Int.toString(numBindings("local", bindingsNew))^"\n");
           codegenlist(statements,outFile,(paramBindings@localBindings@bindings),className)
         end
       )
@@ -199,7 +199,6 @@ open jackAS;
               val l3 = nextLabel()
           in
             codegen(e,outFile,bindings,className);
-            (* TextIO.output(outFile, "not\n"); *)
             TextIO.output(outFile, "if-goto "^l1^"\n");
             TextIO.output(outFile, "goto "^l2^"\n");
             TextIO.output(outFile, "label "^l1^"\n");
@@ -290,6 +289,18 @@ open jackAS;
         let val (typ,segment,offset) = boundTo(id,bindings)
         in
           TextIO.output(outFile, "push "^segment^" "^Int.toString(offset)^"\n")
+        end
+      )
+
+    | codegen(idarray'(id,e),outFile,bindings,className) =
+      (
+        TextIO.output(TextIO.stdOut, "Attempt to compile identifier array\n");
+        let val (typ,segment,offset) = boundTo(id,bindings)
+        in
+          codegen(e,outFile,bindings,className);
+          TextIO.output(outFile, "push "^segment^" "^Int.toString(offset)^"\n");
+          TextIO.output(outFile, "add\n");
+          TextIO.output(outFile, "pop pointer 1\npush that 0\n")
         end
       )
 
@@ -395,11 +406,11 @@ open jackAS;
         TextIO.output(outFile, "call String.new 1\n");
         List.app (fn c => TextIO.output(outFile, "push constant "^(Int.toString(Char.ord c))^"\n" ^
                                 "call String.appendChar 2\n")) (String.explode s)
-)
+      )
 
-    | codegen(_,outFile,bindings,className) =
+    (* | codegen(_,outFile,bindings,className) =
       (TextIO.output(TextIO.stdOut, "Attempt to compile expression not currently supported!\n");
-       raise Unimplemented) 
+       raise Unimplemented)  *)
 
     and codegenlist([],outFile,bindings,className) = ()
     | codegenlist(h::t,outFile,bindings,className) =

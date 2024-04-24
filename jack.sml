@@ -107,12 +107,16 @@ open jackAS;
     | codegen(constructor'(typ,id,params,(vardecs,statements)),outFile,bindings,className) =
       (
         TextIO.output(TextIO.stdOut, "Attempt to compile constructor named "^id^"\n");
+        (* TextIO.output(TextIO.stdOut, "Number of local variables: "^Int.toString(length vardecs)^"\n"); *)
         let val paramBindings = createParamBindings(params, 0)
             val localBindings = createLocalBindings(vardecs)
             val bindingsNew = paramBindings@localBindings@bindings
         in
+          (* TextIO.output(TextIO.stdOut, "Number of param bindings: "^Int.toString(length paramBindings)^"\n");
+          TextIO.output(TextIO.stdOut, "Number of local bindings: "^Int.toString(length localBindings)^"\n");
+          TextIO.output(TextIO.stdOut, "Number of bindingsNew: "^Int.toString(length bindingsNew)^"\n"); *)
           TextIO.output(outFile,"function "^className^"."^id^" "^Int.toString(length vardecs)^"\n");
-          TextIO.output(outFile,"push constant "^(Int.toString(length bindingsNew))^"\n");
+          TextIO.output(outFile,"push constant "^(Int.toString(numBindings("this", bindingsNew)))^"\n");
           TextIO.output(outFile,"call Memory.alloc 1\n");
           TextIO.output(outFile,"pop pointer 0\n");
           codegenlist(statements,outFile,(paramBindings@localBindings@bindings),className)
@@ -134,9 +138,16 @@ open jackAS;
     | codegen(method'(typ,id,params,(vardecs,statements)),outFile,bindings,className) =
         (
           TextIO.output(TextIO.stdOut, "Attempt to compile method named "^id^"\n");
-          let val bindingsNew = createParamBindings(params, 0)@createLocalBindings(vardecs)@bindings
+          let val paramBindings = createParamBindings(params, 1)
+              val localBindings = createLocalBindings(vardecs)
+              val bindingsNew = paramBindings@localBindings@bindings
           in
-            TextIO.output(outFile,"function "^className^"."^id^" "^Int.toString(length vardecs)^"\n");
+            (* TextIO.output(TextIO.stdOut, "Number of local variables: "^Int.toString(length vardecs)^"\n");
+            TextIO.output(TextIO.stdOut, "Number of local bindings: "^Int.toString(length localBindings)^"\n");
+            TextIO.output(TextIO.stdOut, "Number of param bindings: "^Int.toString(length paramBindings)^"\n");
+            TextIO.output(TextIO.stdOut, "Number of bindings: "^Int.toString(length bindings)^"\n");
+            TextIO.output(TextIO.stdOut, "Number of bindingsNew: "^Int.toString(length bindingsNew)^"\n"); *)
+            TextIO.output(outFile,"function "^className^"."^id^" "^Int.toString(length localBindings)^"\n");
             TextIO.output(outFile,"push argument 0\npop pointer 0\n");
             codegenlist(statements,outFile,bindingsNew,className)
           end
@@ -185,15 +196,18 @@ open jackAS;
           TextIO.output(TextIO.stdOut, "Attempt to compile if-else statement\n");
           let val l1 = nextLabel()
               val l2 = nextLabel()
+              val l3 = nextLabel()
           in
             codegen(e,outFile,bindings,className);
-            TextIO.output(outFile, "not\n");
+            (* TextIO.output(outFile, "not\n"); *)
             TextIO.output(outFile, "if-goto "^l1^"\n");
-            List.app (fn s => codegen(s,outFile,bindings,className)) stmt1;
             TextIO.output(outFile, "goto "^l2^"\n");
             TextIO.output(outFile, "label "^l1^"\n");
+            List.app (fn s => codegen(s,outFile,bindings,className)) stmt1;
+            TextIO.output(outFile, "goto "^l3^"\n");
+            TextIO.output(outFile, "label "^l2^"\n");
             List.app (fn s => codegen(s,outFile,bindings,className)) stmt2;
-            TextIO.output(outFile, "label "^l2^"\n")
+            TextIO.output(outFile, "label "^l3^"\n")
           end
         )
 
@@ -374,17 +388,14 @@ open jackAS;
       (TextIO.output(TextIO.stdOut, "Attempt to compile integer\n");
        TextIO.output(outFile, "push constant "^Int.toString(i)^"\n"))
 
-    (* | codegen(string'(s),outFile,bindings,className) =
+    | codegen(string'(s),outFile,bindings,className) =
       (
         TextIO.output(TextIO.stdOut, "Attempt to compile string\n");
-        TextIO.output(outFile, "push constant "^Int.toString(length s)^"\n");
+        TextIO.output(outFile, "push constant "^(Int.toString(size s))^"\n");
         TextIO.output(outFile, "call String.new 1\n");
-        TextIO.output(outFile, "pop temp 0\n");
-        TextIO.output(outFile, "push temp 0\n");
-        TextIO.output(outFile, "push constant 0\n");
-        TextIO.output(outFile, "push constant "^(Int.toString(length s))^"\n");
-        TextIO.output(outFile, "call String.appendChar 4\n")
-      ) *)
+        List.app (fn c => TextIO.output(outFile, "push constant "^(Int.toString(Char.ord c))^"\n" ^
+                                "call String.appendChar 2\n")) (String.explode s)
+)
 
     | codegen(_,outFile,bindings,className) =
       (TextIO.output(TextIO.stdOut, "Attempt to compile expression not currently supported!\n");

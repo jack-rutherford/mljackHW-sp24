@@ -11,7 +11,12 @@ This function recursively traverses the AST to analyze the structure of the prog
 
 You utilize this by being in the mljack-hw24 directory and typing `jack` into the terminal, and then the path to the `.jack` file you want to compile.
 
-Example: `> jack` --> `> Seven/Main.jack` --> `> diff Seven/Main.vm Seven/Main.vm.goal`
+Example: 
+```
+> jack 
+> Seven/Main.jack
+> diff Seven/Main.vm Seven/Main.vm.goal
+```
 
 ## Codegen Function
 

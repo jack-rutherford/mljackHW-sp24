@@ -1,4 +1,5 @@
 # Jack Code Generator
+### Author: Jack Rutherford
 
 This README provides an overview of the `jack.sml` code and explains the `codegen` function and the `create_bindings` functions.
 
